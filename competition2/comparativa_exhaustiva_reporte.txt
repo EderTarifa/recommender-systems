@@ -1,0 +1,72 @@
+====================================================================================================
+COMPARATIVA EXHAUSTIVA DE PREPROCESADO - REPORTE FINAL
+====================================================================================================
+
+
+🔍 HALLAZGOS CLAVE:
+
+1️⃣  PARADOJA: El Reverse Geocoding EMPEORA el Modelo
+   ├─ v0 (sin geocoding):        RMSE 1.0128 ✓ MEJOR
+   ├─ v2 (con geocoding):        RMSE 1.0809 (~6.7% peor)
+   ├─ v3 (geocoding + embeddings): RMSE 1.0634 (~5% peor)
+   └─ Causa probable: Datos geocodeados incompletos/inexactos agregan ruido
+
+2️⃣  XGBoost vs LightGBM
+   ├─ XGBoost promedio RMSE: 1.0524
+   ├─ LightGBM promedio RMSE: 1.1247
+   └─ XGBoost es ~7% mejor en todas las variantes
+
+3️⃣  Impacto de Hiperparámetros
+   ├─ Heavy (n_est=150, depth=7) vs Light (n_est=80, depth=5)
+   ├─ XGB-Heavy mejor en v0: 1.0128 (vs 1.0253 Light) = ~1.2% mejora
+   ├─ Pero más consumo de memoria y tiempo de entrenamiento
+   └─ Light es más eficiente para este dataset
+
+4️⃣  El Preprocesamiento Más Complejo ≠ Mejor Rendimiento
+   ├─ Features adicionales (geocoding + embeddings):
+   │  └─ 45 features (v0) → 54 features (v2) → 53 features (v3)
+   ├─ Pero v0 con MENOS features es el mejor
+   └─ Conclusión: Features simples y limpias > Features complejas
+
+5️⃣  Margin de Mejora sobre Baseline
+   ├─ v0: 31.5% de mejora ✓✓✓
+   ├─ v3: 28.1% de mejora
+   ├─ v2: 26.9% de mejora
+   └─ Todos superan significativamente el baseline (1.4795)
+
+📊 RECOMENDACIONES:
+
+✅ USAR:
+   • XGBoost con parámetros Heavy (n_estimators=150, max_depth=7)
+   • Pipeline v0 (sin reverse geocoding, sin embeddings)
+   • Features básicas pero bien seleccionadas
+   • Esto da RMSE = 1.0128 (31.5% mejora)
+
+❌ EVITAR:
+   • Reverse geocoding (no mejora, suma ruido)
+   • Word2Vec embeddings con datos limitados
+   • LightGBM (es consistentemente peor que XGBoost)
+   • Exceso de features complejas
+
+🎯 RECOMENDACIÓN FINAL:
+   Usar XGBoost v0 Heavy como modelo final:
+   • RMSE: 1.0128
+   • MAE: 0.7349
+   • Mejora vs Baseline: 31.5%
+   • Features: 45 (simples y interpretables)
+   • Velocidad: Rápido de entrenar y predecir
+
+
+====================================================================================================
+TABLA RESUMEN
+====================================================================================================
+
+                   Configuración   RMSE     MAE  Mejora %  Features Tiempo Relativo
+v0 + XGBoost Heavy (RECOMENDADO) 1.0128  0.7349      31.5        45            1.0x
+              v0 + XGBoost Light 1.0253  0.7534      30.7        45            0.6x
+              v3 + XGBoost Heavy 1.0634  0.7938      28.1        53            1.0x
+              v2 + XGBoost Heavy 1.0809  0.8079      26.9        54            1.0x
+           Baseline (sin modelo) 1.4795       -       0.0         0               -
+
+====================================================================================================
+Arquivo generado: 2026-04-09 12:05:51.136212

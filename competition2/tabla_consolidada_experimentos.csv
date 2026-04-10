@@ -1,0 +1,26 @@
+Model,Type,Category Top-K,Attributes,RMSE,MAE,Features,Improvement %
+v0_XGB_Heavy,Version Comparison,20,FULL,1.0128,0.7349,45,31.5
+cat_top10_attr_FULL,Feature Experiment,10,FULL,1.0253,0.7533,50,30.7
+cat_top10_attr_2_IMPORTANT,Feature Experiment,10,2_IMPORTANT,1.0253,0.7533,50,30.7
+cat_top10_attr_4_COMMON,Feature Experiment,10,4_COMMON,1.0253,0.7533,50,30.7
+cat_top15_attr_FULL,Feature Experiment,15,FULL,1.0253,0.7533,50,30.7
+cat_top15_attr_4_COMMON,Feature Experiment,15,4_COMMON,1.0253,0.7533,50,30.7
+cat_top15_attr_2_IMPORTANT,Feature Experiment,15,2_IMPORTANT,1.0253,0.7533,50,30.7
+cat_top10_attr_NONE,Feature Experiment,10,NONE,1.0253,0.7533,50,30.7
+cat_top20_attr_FULL,Feature Experiment,20,FULL,1.0253,0.7533,50,30.7
+cat_top20_attr_4_COMMON,Feature Experiment,20,4_COMMON,1.0253,0.7533,50,30.7
+cat_top20_attr_2_IMPORTANT,Feature Experiment,20,2_IMPORTANT,1.0253,0.7533,50,30.7
+cat_top20_attr_NONE,Feature Experiment,20,NONE,1.0253,0.7533,50,30.7
+cat_top25_attr_FULL,Feature Experiment,25,FULL,1.0253,0.7533,50,30.7
+cat_top25_attr_4_COMMON,Feature Experiment,25,4_COMMON,1.0253,0.7533,50,30.7
+cat_top25_attr_2_IMPORTANT,Feature Experiment,25,2_IMPORTANT,1.0253,0.7533,50,30.7
+cat_top15_attr_NONE,Feature Experiment,15,NONE,1.0253,0.7533,50,30.7
+cat_top25_attr_NONE,Feature Experiment,25,NONE,1.0253,0.7533,50,30.7
+cat_top30_attr_FULL,Feature Experiment,30,FULL,1.0253,0.7533,50,30.7
+cat_top30_attr_2_IMPORTANT,Feature Experiment,30,2_IMPORTANT,1.0253,0.7533,50,30.7
+cat_top30_attr_4_COMMON,Feature Experiment,30,4_COMMON,1.0253,0.7533,50,30.7
+cat_top30_attr_NONE,Feature Experiment,30,NONE,1.0253,0.7533,50,30.7
+v0_XGB_Light,Version Comparison,20,FULL,1.0253,0.7534,45,30.7
+v3_XGB_Heavy,Version Comparison,20,FULL,1.0634,0.7938,53,28.1
+v2_XGB_Heavy,Version Comparison,20,FULL,1.0809,0.8079,54,26.9
+v4_XGB_Heavy,Version Comparison,20,FULL,1.1283,0.0,38,23.8

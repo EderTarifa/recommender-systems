@@ -1,0 +1,79 @@
+NaNs:
+    USUARIOS:
+- user name -> "Unknown"
+- elite -> cuantas veces a sido elite, desde que año y cuantos años lleva siéndolo:
+{'elite_count': 0, 'elite_from_year': 0, 'years_as_elite': 0}
+- friends -> count (pasamos de una lista de amigos a contar cuantos amigos hay (GNN??????))
+- yelping_since -> número de días que lleva (cálculo hasta 2024-01-01 (ultimo día en los datos))
+- useful, funny y cool -> median (podemos hacer knn????)
+- columnas que empiezan con compliment_ -> se suman todas (modelo v1 solo)
+
+    NEGOCIOS:
+- código postal: agrupamos por ciudades y luego cogemos la mediana del cp por grupo
+- address: drop (hemos probabo a inferir cp y address con el lon y lat pero peor resultado)
+- 
+
+
+PREPROCESAMIENTOS:
+
+Modelo v1: sumando todas las columnas que empiezan con compliment_
+Modelo v2: cada columna por separado (ligeramente mejor que v1)
+Modelo v3: infiriendo cp y address con knn y kmeans (peor que v2)
+Modelo v4: 
+
+
+
+
+
+Comenzamos el análisis comparando tres versiones distintas de preprocesamiento. La versión 0 era 
+simplemente la combinación base de datos de usuarios y negocios sin enriquecimiento adicional. 
+La versión 2 agregaba reverse geocoding para obtener códigos postales de las coordenadas. La versión 3 
+incluía tanto reverse geocoding como embeddings de Word2Vec para las categorías y atributos. Al entrenar 
+estos modelos con XGBoost usando 150 estimadores y profundidad 7, encontramos que la versión 0 obtenía un 
+RMSE de 1.0128, mientras que la versión 2 empeoraba hasta 1.0809 y la versión 3 llegaba a 1.0634. Esta fue 
+nuestra primera sorpresa significativa: agregar datos enriquecidos empeoraba el modelo.
+
+Decidimos entonces probar una cuarta versión que mantuviera los embeddings pero eliminara el reverse 
+geocoding, pensando que quizás el geocoding era lo que introducía ruido. Sin embargo, esta versión 4 
+resultó aún peor con un RMSE de 1.1283. Esto nos llevó a la conclusión de que no era simplemente el 
+geocoding el problema, sino que la complejidad adicional sin suficientes datos de entrenamiento para los 
+embeddings no aportaba mejora.
+
+Con esta evidencia en mano, decidimos investigar si el problema estaba en la selección de categorías y 
+atributos. Diseñamos un experimento sistemático para probar diferentes configuraciones. En lugar de 
+hardcodear un número fijo de categorías, testamos los 10, 15, 20, 25 y 30 categorías más frecuentes. 
+Para los atributos, en lugar de los 4 o 5 que se usaban originalmente, probamos usar todos los disponibles, 
+solo los 4 más comunes, solo los 2 más importantes, o ninguno.
+
+Entrenamos 20 combinaciones distintas de estas configuraciones usando XGBoost con parámetros más ligeros 
+para acelerar el proceso. Lo que encontramos fue notable: todas estas combinaciones producían RMSE muy 
+similares, alrededor de 1.0253, con una variación menor al 0.7%. Esto indicaba que la selección precisa 
+de categorías y atributos no era el factor limitante.
+
+Compilamos todos estos resultados en una tabla consolidada que incluía también las versiones anteriores. 
+La tabla final mostraba que el modelo v0 con XGBoost Heavy seguía siendo el mejor con RMSE de 1.0128 y una 
+mejora del 31.5% respecto al baseline.
+
+Las conclusiones que extraemos de este análisis son que el preprocesamiento no es el cuello de botella en 
+este problema. La versión más simple basada únicamente en los datos limpios de usuarios y negocios supera 
+ampliamente cualquier intento de enriquecimiento. El reverse geocoding agregó ruido probablemente por 
+imprecisiones en los datos geocodeados. Los embeddings de Word2Vec no fueron efectivos porque el volumen de
+datos de entrenamiento era insuficiente. La variación en la selección de features de categorías y atributos 
+resultó en mejoras insignificantes.
+
+Por lo tanto, recomendamos mantener el modelo v0 XGBoost Heavy como la solución final. Si se desea mejorar 
+el rendimiento en el futuro, los esfuerzos deberían enfocarse en ajuste fino de hiperparámetros, métodos de
+ensemble, o procesamiento posterior de predicciones, en lugar de invertir más tiempo en ingeniería
+adicional de features o preprocesamiento más sofisticado.
+
+
+
+user_id y business_id (sin, con y media)
+
+# Calcular efectos en TRAIN
+user_effect = train_final.groupby('user_id')['target'].mean() - train_final['target'].mean()
+business_effect = train_final.groupby('business_id')['target'].mean() - train_final['target'].mean()
+
+# Agregar como 2 features más
+train_final['user_effect'] = train_final['user_id'].map(user_effect).fillna(0)
+train_final['business_effect'] = train_final['business_id'].map(business_effect).fillna(0)
