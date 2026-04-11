@@ -1,0 +1,174 @@
+
+══════════════════════════════════════════════════════════════════════
+  ANÁLISIS CATEGORIES & ATTRIBUTES
+══════════════════════════════════════════════════════════════════════
+
+Cargando datos...
+  Negocios : 30,069
+  Reviews  : 967,784
+
+══════════════════════════════════════════════════════════════════════
+  ANÁLISIS DE CATEGORIES
+══════════════════════════════════════════════════════════════════════
+
+  Total categorías únicas : 1,201
+  Total reviews (train)   : 967,784
+
+  Calculando curva de cobertura de negocios...
+  Calculando curva de cobertura de reviews...
+
+──────────────────────────────────────────────────────────────────────
+  RESULTADOS — CATEGORIES
+──────────────────────────────────────────────────────────────────────
+
+       N   Cob. Negocios   Cob. Reviews   % freq acum
+  ──────  ──────────────  ─────────────  ────────────
+       5          72.4%         86.0%         20.0%
+      10          88.3%         93.2%         28.5%
+      20          95.2%         97.9%         39.4%
+      30          95.9%         98.4%         47.0%
+      50          98.5%         99.5%         56.4%
+      75          98.8%         99.5%         64.1%
+     100          99.4%         99.7%         69.8%
+     150          99.8%         99.9%         77.5%
+     200          99.8%         99.9%         82.9%
+     250          99.8%         99.9%         86.6%
+     300          99.8%         99.9%         89.4%
+
+  ── Puntos de corte recomendados (nivel review) ──
+  Top-N para 90% cobertura reviews : 8
+  Top-N para 95% cobertura reviews : 11
+  Top-N para 99% cobertura reviews : 31
+  Codo de ganancia marginal (<0.001) : N ≈ 8
+
+  ── Top-20 categorías más frecuentes ──
+    1. Restaurants                              10,457 negocios (34.8%)
+    2. Food                                      5,575 negocios (18.5%)
+    3. Shopping                                  4,868 negocios (16.2%)
+    4. Beauty & Spas                             2,921 negocios (9.7%)
+    5. Home Services                             2,782 negocios (9.3%)
+    6. Nightlife                                 2,438 negocios (8.1%)
+    7. Health & Medical                          2,358 negocios (7.8%)
+    8. Local Services                            2,249 negocios (7.5%)
+    9. Bars                                      2,195 negocios (7.3%)
+   10. Automotive                                2,145 negocios (7.1%)
+   11. Event Planning & Services                 1,994 negocios (6.6%)
+   12. American (Traditional)                    1,672 negocios (5.6%)
+   13. Sandwiches                                1,643 negocios (5.5%)
+   14. Active Life                               1,563 negocios (5.2%)
+   15. Pizza                                     1,398 negocios (4.6%)
+   16. Coffee & Tea                              1,337 negocios (4.4%)
+   17. Fast Food                                 1,307 negocios (4.3%)
+   18. American (New)                            1,214 negocios (4.0%)
+   19. Breakfast & Brunch                        1,190 negocios (4.0%)
+   20. Hotels & Travel                           1,184 negocios (3.9%)
+
+──────────────────────────────────────────────────────────────────────
+
+  ✅ RECOMENDACIÓN CATEGORIES:
+     • Para AutoGluon    → pasar columna texto 'categories' completa + 'top_category'
+     • Para OHE (XGBoost) → top-11 cubre el 95% de reviews
+     • Para embeddings (DCN-V2) → vocabulario completo (1201 tokens, min_freq=5)
+
+══════════════════════════════════════════════════════════════════════
+  ANÁLISIS DE ATTRIBUTES
+══════════════════════════════════════════════════════════════════════
+
+  Parseando attributes (puede tardar un momento)...
+
+  Total atributos únicos (planos) : 81
+  Negocios con attributes no nulos : 27,300 (90.8%)
+
+  Calculando curva de cobertura...
+
+──────────────────────────────────────────────────────────────────────
+  RESULTADOS — ATTRIBUTES
+──────────────────────────────────────────────────────────────────────
+
+       N   Cob. Negocios   Cob. Reviews
+  ──────  ──────────────  ─────────────
+       5          84.9%         94.9%
+      10          87.2%         95.9%
+      15          88.7%         96.7%
+      20          90.6%         97.2%
+      30          90.6%         97.2%
+      50          90.6%         97.2%
+      75          90.6%         97.2%
+
+  ── Puntos de corte recomendados (nivel review) ──
+  Top-N para 80% cobertura reviews : 1
+  Top-N para 90% cobertura reviews : 1
+  Top-N para 95% cobertura reviews : 7
+  Codo de ganancia marginal (<0.001) : N ≈ 2
+
+  ── Top-30 atributos más frecuentes ──
+    #  Atributo                                       Negocios   % biz        Tipo   #Vals únicos
+  ───  ───────────────────────────────────────────── ─────────  ──────  ──────────  ─────────────
+    1  BusinessAcceptsCreditCards                       23,880  79.4%    numérico              2
+    2  BusinessParking_valet                            17,751  59.0%    numérico              2
+    3  BusinessParking_garage                           17,354  57.7%    numérico              2
+    4  BusinessParking_validated                        17,320  57.6%    numérico              2
+    5  BusinessParking_lot                              17,315  57.6%    numérico              2
+    6  BusinessParking_street                           17,065  56.8%    numérico              2
+    7  RestaurantsPriceRange2                           17,030  56.6%    numérico              4
+    8  BikeParking                                      14,435  48.0%    numérico              2
+    9  RestaurantsTakeOut                               11,499  38.2%    numérico              2
+   10  WiFi                                             11,340  37.7%  categórico              2
+   11  GoodForKids                                      10,723  35.7%    numérico              2
+   12  RestaurantsDelivery                              10,454  34.8%    numérico              2
+   13  OutdoorSeating                                    9,328  31.0%    numérico              2
+   14  HasTV                                             8,986  29.9%    numérico              2
+   15  RestaurantsReservations                           8,958  29.8%    numérico              2
+   16  RestaurantsGoodForGroups                          8,805  29.3%    numérico              2
+   17  ByAppointmentOnly                                 8,497  28.3%    numérico              2
+   18  Ambience_casual                                   8,298  27.6%    numérico              2
+   19  Ambience_upscale                                  8,141  27.1%    numérico              2
+   20  Ambience_romantic                                 8,080  26.9%    numérico              2
+   21  Ambience_touristy                                 8,026  26.7%    numérico              2
+   22  Ambience_classy                                   7,999  26.6%    numérico              2
+   23  Caters                                            7,944  26.4%    numérico              2
+   24  Ambience_intimate                                 7,888  26.2%    numérico              2
+   25  Ambience_hipster                                  7,857  26.1%    numérico              2
+   26  RestaurantsAttire                                 7,814  26.0%  categórico              2
+   27  Ambience_divey                                    7,647  25.4%    numérico              2
+   28  Ambience_trendy                                   7,631  25.4%    numérico              2
+   29  NoiseLevel                                        7,573  25.2%  categórico              4
+   30  WheelchairAccessible                              5,722  19.0%    numérico              2
+
+  Desglose (top-81): 66 numéricos/binarios, 15 categóricos
+
+──────────────────────────────────────────────────────────────────────
+
+  ✅ RECOMENDACIÓN ATTRIBUTES:
+     • Para AutoGluon    → columnas individuales por atributo (sin OHE),
+                           usar todos los de pct_biz > 5% (41 atributos)
+     • Para OHE (XGBoost) → top-1 cubre el 90% de reviews
+     • Para embeddings (DCN-V2) → todos los categóricos como sparse fields,
+                                   todos los numéricos como dense fields
+
+
+██████████████████████████████████████████████████████████████████████
+  RESUMEN FINAL — ¿CUÁNTAS CATEGORIES Y ATTRIBUTES USAR?
+██████████████████████████████████████████████████████████████████████
+
+  ┌─────────────────┬──────────────────────────────────────────────────────┐
+  │     MODELO      │  CATEGORIES                  ATTRIBUTES              │
+  ├─────────────────┼──────────────────────────────────────────────────────┤
+  │ AutoGluon       │  texto completo + top_cat    columnas individuales (>5% biz → ~41) │
+  │ LightGBM+TE     │  top_category (string)       columnas individuales (top-1)       │
+  │ CatBoost        │  top_category (string)       columnas individuales (top-1)       │
+  │ XGBoost+OHE     │  OHE top-11  (95% cob.)   OHE top-1   (90% cob.)            │
+  │ DCN-V2/DeepFM   │  vocab completo + padding    sparse+dense, vocab completo            │
+  └─────────────────┴──────────────────────────────────────────────────────┘
+
+  Números clave:
+    Categories únicas totales : 1,201
+    Top-N para 90% reviews    : 8
+    Top-N para 95% reviews    : 11
+    Codo de ganancia marginal : ~8
+
+    Attributes únicos totales : 81
+    Top-N para 90% reviews    : 1
+    Top-N para 95% reviews    : 7
+    Attrs con >5% cobertura biz: 41
+    Codo de ganancia marginal : ~2
