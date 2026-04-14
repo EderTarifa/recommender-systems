@@ -1,6 +1,6 @@
 """
-preprocess_autogluon.py  (v2 — post análisis)
-=============================================
+preprocess_autogluon.py  (v2 — post análisis + splits temporales)
+==================================================================
 Decisiones actualizadas según analyze_cats_attrs.py:
 
   CATEGORIES (1.201 únicas):
@@ -12,13 +12,20 @@ Decisiones actualizadas según analyze_cats_attrs.py:
     - Usar TODOS (no filtrar por top-N, son solo 81)
     - Los sub-dicts (BusinessParking, Ambience, Music…) ya salen aplanados del parser
     - 66 numéricos/binarios → float32
-    - 15 categóricos (WiFi, NoiseLevel, RestaurantsAttire, Alcohol, Smoking,
-      RestaurantsAttire…) → string para que AutoGluon los trate como categoría
+    - 15 categóricos (WiFi, NoiseLevel, RestaurantsAttire, Alcohol, Smoking…) 
+      → string para que AutoGluon los trate como categoría
     - NO se hardcodea ninguna lista de atributos: se parsean todos dinámicamente
 
+  IDENTIFICACIÓN Y TEMPORALIDAD:
+    - user_id, business_id → SE MANTIENEN en output, se dropean tras split
+    - date → SE MANTIENE en todo el pipeline
+    - date_num → timestamp numérico para ordenar splits, se dropea tras split
+    - train_autogluon2.py: ordena por date_num, hace splits 70/15/15,
+      luego dropea date_num/user_id/business_id antes de entrenar
+
 Output:
-  data/train_ag.parquet
-  data/test_ag.parquet
+  data/train_ag.parquet (con user_id, business_id, date, date_num)
+  data/test_ag.parquet  (con user_id, business_id, date, date_num)
 """
 
 import pandas as pd
@@ -32,11 +39,22 @@ from collections import Counter
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
-DATA_DIR      = "data3"
+DATA_DIR      = "data"
 NEGOCIOS_PATH = os.path.join(DATA_DIR, "negocios.csv")
 USUARIOS_PATH = os.path.join(DATA_DIR, "usuarios.csv")
 TRAIN_PATH    = os.path.join(DATA_DIR, "train_reviews.csv")
-TEST_PATH     = os.path.join(DATA_DIR, "test_reviews.csv")
+
+# Buscar test_final.csv; si no existe, fallback a test_reviews.csv
+_test_final = os.path.join(DATA_DIR, "test_final.csv")
+_test_reviews = os.path.join(DATA_DIR, "test_reviews.csv")
+if os.path.exists(_test_final):
+    TEST_PATH = _test_final
+elif os.path.exists(_test_reviews):
+    TEST_PATH = _test_reviews
+    print(f"⚠ AVISO: {_test_final} no existe. Usando fallback: {_test_reviews}")
+else:
+    raise FileNotFoundError(f"Ni {_test_final} ni {_test_reviews} existen en {DATA_DIR}/")
+
 OUT_TRAIN     = os.path.join(DATA_DIR, "train_ag.parquet")
 OUT_TEST      = os.path.join(DATA_DIR, "test_ag.parquet")
 
@@ -410,11 +428,11 @@ def build_dataset(reviews_path: str,
                                          .fillna(0).astype(np.int32))
 
     reviews["date"] = pd.to_datetime(reviews["date"], errors="coerce")
+    reviews["date_num"] = reviews["date"].astype(np.int64) // 10**9  # timestamp para ordenamiento
     reviews["review_year"]       = reviews["date"].dt.year.astype("Int16")
     reviews["review_month"]      = reviews["date"].dt.month.astype("Int8")
     reviews["review_dow"]        = reviews["date"].dt.dayofweek.astype("Int8")
     reviews["review_is_weekend"] = (reviews["review_dow"] >= 5).astype(np.int8)
-    reviews.drop(columns=["date"], inplace=True)
 
     print("    Mergeando usuarios...")
     df = reviews.merge(usuarios_df, on="user_id", how="left")
@@ -425,11 +443,21 @@ def build_dataset(reviews_path: str,
     df = df.merge(negocios_df, on="business_id", how="left")
     gc.collect()
 
-    df.drop(columns=["user_id", "business_id"], inplace=True, errors="ignore")
-
+    # Mantener user_id, business_id y date_num para splits temporales posteriores
+    # Reordenar columnas: target (si train) → user_id, business_id, date_num → resto
+    
+    priority_cols = []
     if is_train and "target" in df.columns:
-        cols = ["target"] + [c for c in df.columns if c != "target"]
-        df = df[cols]
+        priority_cols.append("target")
+    
+    # Agregar columnas de identificación y fecha al inicio
+    for col in ["user_id", "business_id", "date_num"]:
+        if col in df.columns:
+            priority_cols.append(col)
+    
+    # Resto de columnas
+    other_cols = [c for c in df.columns if c not in priority_cols]
+    df = df[priority_cols + other_cols]
 
     cat_cols_obj = df.select_dtypes(include=["object"]).columns.tolist()
     num_cols     = df.select_dtypes(include=[np.number]).columns.tolist()

@@ -1,3 +1,17 @@
 AutogluonModels/
 data/
 predictions/
+data/*
+data2/*
+data3/*
+data4/*
+definitive_data/*
+data_definitive_cf/*
+data5/*
+models/*
+models2/*
+models3/*
+models4/*
+models_definitive/*
+models5/*
+submissions/*

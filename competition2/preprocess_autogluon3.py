@@ -1,24 +1,5 @@
 """
-preprocess_autogluon.py  (v2 — post análisis)
-=============================================
-Decisiones actualizadas según analyze_cats_attrs.py:
-
-  CATEGORIES (1.201 únicas):
-    - Top-8 cubre 90% de reviews → vocabulario pequeño, no hay que filtrar nada
-    - AutoGluon recibe: columna texto completa + top_category como string
-    - NO hace falta OHE ni top-N
-
-  ATTRIBUTES (81 únicos en total):
-    - Usar TODOS (no filtrar por top-N, son solo 81)
-    - Los sub-dicts (BusinessParking, Ambience, Music…) ya salen aplanados del parser
-    - 66 numéricos/binarios → float32
-    - 15 categóricos (WiFi, NoiseLevel, RestaurantsAttire, Alcohol, Smoking,
-      RestaurantsAttire…) → string para que AutoGluon los trate como categoría
-    - NO se hardcodea ninguna lista de atributos: se parsean todos dinámicamente
-
-Output:
-  data/train_ag.parquet
-  data/test_ag.parquet
+preprocess_autogluon3.py  (v3 — post análisis + splits temporales)
 """
 
 import pandas as pd
@@ -32,13 +13,24 @@ from collections import Counter
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIG
 # ─────────────────────────────────────────────────────────────────────────────
-DATA_DIR      = "data3"
+DATA_DIR      = "data2"
 NEGOCIOS_PATH = os.path.join(DATA_DIR, "negocios.csv")
 USUARIOS_PATH = os.path.join(DATA_DIR, "usuarios.csv")
 TRAIN_PATH    = os.path.join(DATA_DIR, "train_reviews.csv")
-TEST_PATH     = os.path.join(DATA_DIR, "test_reviews.csv")
-OUT_TRAIN     = os.path.join(DATA_DIR, "train_ag.parquet")
-OUT_TEST      = os.path.join(DATA_DIR, "test_ag.parquet")
+
+# Buscar test_final.csv; si no existe, fallback a test_reviews.csv
+_test_final = os.path.join(DATA_DIR, "test_final.csv")
+_test_reviews = os.path.join(DATA_DIR, "test_reviews.csv")
+if os.path.exists(_test_final):
+    TEST_PATH = _test_final
+elif os.path.exists(_test_reviews):
+    TEST_PATH = _test_reviews
+    print(f"⚠ AVISO: {_test_final} no existe. Usando fallback: {_test_reviews}")
+else:
+    raise FileNotFoundError(f"Ni {_test_final} ni {_test_reviews} existen en {DATA_DIR}/")
+
+OUT_TRAIN     = os.path.join("data2", "train_ag.parquet")
+OUT_TEST      = os.path.join("data2", "test_ag.parquet")
 
 # Atributos que el análisis identificó como categóricos (string, no 0/1).
 # Son los 15 de los 81 totales cuyo tipo == categórico.
@@ -332,17 +324,18 @@ def process_usuarios(path: str) -> pd.DataFrame:
     # ── Elite ─────────────────────────────────────────────────────────────────
     def elite_features(s):
         if pd.isna(s) or str(s).strip() in ("", "nan"):
-            return 0, 0, 0
+            return 0, 0, 0, []
         try:
             years = [int(y) for y in str(s).split(",") if y.strip().isdigit()]
-            return (len(years), min(years) if years else 0, len(years))
+            return (len(years), min(years) if years else 0, len(years), years)
         except Exception:
-            return 0, 0, 0
+            return 0, 0, 0, []
 
     parsed = df["elite"].apply(elite_features)
     df["elite_count"]     = [x[0] for x in parsed]
     df["elite_from_year"] = [x[1] for x in parsed]
     df["years_as_elite"]  = [x[2] for x in parsed]
+    df["elite_years_list"] = [x[3] for x in parsed]
     df["elite_bucket"] = pd.cut(
         df["elite_count"],
         bins=[-1, 0, 2, 5, 10, 999],
@@ -360,11 +353,8 @@ def process_usuarios(path: str) -> pd.DataFrame:
     df.drop(columns=["friends"], inplace=True)
 
     # ── Yelping since ─────────────────────────────────────────────────────────
+    # SE MANTIENE para calcular user_seniority_days en build_dataset
     df["yelping_since"] = pd.to_datetime(df["yelping_since"], errors="coerce")
-    ref = pd.Timestamp("2024-01-01")
-    df["days_yelping"]  = (ref - df["yelping_since"]).dt.days.fillna(0).astype(np.int32)
-    df["years_yelping"] = (df["days_yelping"] / 365.25).round(1).astype("float32")
-    df.drop(columns=["yelping_since"], inplace=True)
 
     # ── Numéricas ─────────────────────────────────────────────────────────────
     for col in ["useful", "funny", "cool", "review_count", "fans", "average_stars"]:
@@ -391,7 +381,8 @@ def build_dataset(reviews_path: str,
                   usuarios_df: pd.DataFrame,
                   negocios_df: pd.DataFrame,
                   output_path: str,
-                  is_train: bool = True) -> pd.DataFrame:
+                  is_train: bool = True,
+                  train_stats: dict = None) -> tuple:
 
     print(f"\n  Cargando reviews: {reviews_path}")
     reviews = pd.read_csv(reviews_path, low_memory=False)
@@ -410,11 +401,11 @@ def build_dataset(reviews_path: str,
                                          .fillna(0).astype(np.int32))
 
     reviews["date"] = pd.to_datetime(reviews["date"], errors="coerce")
+    reviews["date_num"] = reviews["date"].astype(np.int64) // 10**9
     reviews["review_year"]       = reviews["date"].dt.year.astype("Int16")
     reviews["review_month"]      = reviews["date"].dt.month.astype("Int8")
     reviews["review_dow"]        = reviews["date"].dt.dayofweek.astype("Int8")
     reviews["review_is_weekend"] = (reviews["review_dow"] >= 5).astype(np.int8)
-    reviews.drop(columns=["date"], inplace=True)
 
     print("    Mergeando usuarios...")
     df = reviews.merge(usuarios_df, on="user_id", how="left")
@@ -425,11 +416,109 @@ def build_dataset(reviews_path: str,
     df = df.merge(negocios_df, on="business_id", how="left")
     gc.collect()
 
-    df.drop(columns=["user_id", "business_id"], inplace=True, errors="ignore")
+    # ─── USUARIOS: user_seniority_days y was_elite_at_review ────────────────
+    print("    Calculando user_seniority_days y was_elite_at_review...")
+    df["user_seniority_days"] = (df["date"] - df["yelping_since"]).dt.days.clip(lower=0).fillna(0).astype(np.int32)
+    df["was_elite_at_review"] = df.apply(
+        lambda row: 1 if (isinstance(row["elite_years_list"], list) and 
+                          row["review_year"] in row["elite_years_list"]) 
+                   else 0,
+        axis=1
+    ).astype(np.int8)
+    df.drop(columns=["yelping_since", "elite_years_list"], inplace=True, errors="ignore")
 
+    # ─── ORDENAR POR FECHA ───────────────────────────────────────────────────
+    df = df.sort_values("date_num", ascending=True).reset_index(drop=True)
+
+    if is_train:
+        print("    Calculando estadísticas temporales (expanding windows)...")
+        # Máscaras de cold start ANTES de imputar
+        cold_user_mask = df.groupby("user_id").cumcount() == 0
+        cold_biz_mask  = df.groupby("business_id").cumcount() == 0
+
+        # Expanding windows por usuario
+        user_stats = df.groupby("user_id", sort=False).apply(
+            lambda g: g[["target"]].expanding(min_periods=1).mean().shift(1)
+        ).reset_index(level=0, drop=True)
+        df["user_avg_stars_at_time"] = user_stats["target"]
+        df["user_review_count_at_time"] = (
+            df.groupby("user_id", sort=False)["target"]
+            .expanding(min_periods=1).count().shift(1)
+            .reset_index(level=0, drop=True)
+        )
+
+        # Expanding windows por negocio
+        biz_stats = df.groupby("business_id", sort=False).apply(
+            lambda g: g[["target"]].expanding(min_periods=1).mean().shift(1)
+        ).reset_index(level=0, drop=True)
+        df["biz_avg_stars_at_time"] = biz_stats["target"]
+        df["biz_review_count_at_time"] = (
+            df.groupby("business_id", sort=False)["target"]
+            .expanding(min_periods=1).count().shift(1)
+            .reset_index(level=0, drop=True)
+        )
+
+        # Media global de target
+        global_mean = df["target"].mean()
+
+        # Imputar NaN con media global
+        df["user_avg_stars_at_time"] = df["user_avg_stars_at_time"].fillna(global_mean).astype("float32")
+        df["user_review_count_at_time"] = df["user_review_count_at_time"].fillna(0).astype(np.int32)
+        df["biz_avg_stars_at_time"] = df["biz_avg_stars_at_time"].fillna(global_mean).astype("float32")
+        df["biz_review_count_at_time"] = df["biz_review_count_at_time"].fillna(0).astype(np.int32)
+
+        # Cold start flags
+        df["is_cold_user"] = cold_user_mask.astype(np.int8)
+        df["is_cold_biz"] = cold_biz_mask.astype(np.int8)
+
+        # Delta de estrellas
+        df["delta_stars"] = (df["user_avg_stars_at_time"] - df["biz_avg_stars_at_time"]).round(2).astype("float32")
+
+        # Construir train_stats
+        train_stats = {
+            "user_stats": df.groupby("user_id")[["user_avg_stars_at_time", "user_review_count_at_time"]].last(),
+            "biz_stats": df.groupby("business_id")[["biz_avg_stars_at_time", "biz_review_count_at_time"]].last(),
+            "global_mean": global_mean
+        }
+
+    else:
+        print("    Usando estadísticas de entrenamiento...")
+        if train_stats is None:
+            raise ValueError("train_stats requerido para dataset de test")
+
+        # Lookup desde train_stats
+        user_lookup = train_stats["user_stats"]
+        biz_lookup = train_stats["biz_stats"]
+        global_mean = train_stats["global_mean"]
+
+        df["user_avg_stars_at_time"] = df["user_id"].map(user_lookup["user_avg_stars_at_time"]).fillna(global_mean).astype("float32")
+        df["user_review_count_at_time"] = df["user_id"].map(user_lookup["user_review_count_at_time"]).fillna(0).astype(np.int32)
+        df["biz_avg_stars_at_time"] = df["business_id"].map(biz_lookup["biz_avg_stars_at_time"]).fillna(global_mean).astype("float32")
+        df["biz_review_count_at_time"] = df["business_id"].map(biz_lookup["biz_review_count_at_time"]).fillna(0).astype(np.int32)
+
+        # Cold start (usuarios/negocios nuevos)
+        df["is_cold_user"] = (~df["user_id"].isin(user_lookup.index)).astype(np.int8)
+        df["is_cold_biz"] = (~df["business_id"].isin(biz_lookup.index)).astype(np.int8)
+
+        # Delta
+        df["delta_stars"] = (df["user_avg_stars_at_time"] - df["biz_avg_stars_at_time"]).round(2).astype("float32")
+
+    # ─── PRIORIDAD DE COLUMNAS ───────────────────────────────────────────────
+    priority_cols = []
     if is_train and "target" in df.columns:
-        cols = ["target"] + [c for c in df.columns if c != "target"]
-        df = df[cols]
+        priority_cols.append("target")
+    for col in ["user_id", "business_id", "date_num"]:
+        if col in df.columns:
+            priority_cols.append(col)
+    other_cols = [c for c in df.columns if c not in priority_cols]
+    df = df[priority_cols + other_cols]
+
+    # ─── DROPEAR COLUMNAS ANTES DE GUARDAR ───────────────────────────────────
+    cols_to_drop = ["review_useful", "review_funny", "review_cool", 
+                    "average_stars", "stars_business", "review_count", 
+                    "review_count_business", "date",
+                    "days_yelping", "years_yelping"]
+    df.drop(columns=[c for c in cols_to_drop if c in df.columns], inplace=True)
 
     cat_cols_obj = df.select_dtypes(include=["object"]).columns.tolist()
     num_cols     = df.select_dtypes(include=[np.number]).columns.tolist()
@@ -438,14 +527,14 @@ def build_dataset(reviews_path: str,
     print(f"    Columnas numéricas     : {len(num_cols)}")
     print(f"    Columnas string/object : {len(cat_cols_obj)}")
     print(f"      → {cat_cols_obj[:12]}{'...' if len(cat_cols_obj) > 12 else ''}")
-    print(f"    NaN totales            : {df.isna().sum().sum():,} (AutoGluon los maneja)")
+    print(f"    NaN totales            : {df.isna().sum().sum():,}")
 
     print(f"\n    Guardando {output_path}...")
     df.to_parquet(output_path, index=False, engine="pyarrow", compression="snappy")
     size_mb = os.path.getsize(output_path) / 1024 / 1024
     print(f"    ✓ Guardado. Tamaño: {size_mb:.1f} MB")
 
-    return df
+    return df, train_stats
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -473,22 +562,24 @@ if __name__ == "__main__":
     → NaN → se dejan (LightGBM y CatBoost los manejan nativamente)
   """)
 
+    os.makedirs("data2", exist_ok=True)
+
     negocios_df = process_negocios(NEGOCIOS_PATH)
     usuarios_df = process_usuarios(USUARIOS_PATH)
 
     print("\n" + "═"*65)
     print("  GENERANDO TRAIN")
     print("═"*65)
-    train_df = build_dataset(TRAIN_PATH, usuarios_df, negocios_df,
-                             OUT_TRAIN, is_train=True)
+    train_df, train_stats = build_dataset(TRAIN_PATH, usuarios_df, negocios_df,
+                                           OUT_TRAIN, is_train=True)
     del train_df
     gc.collect()
 
     print("\n" + "═"*65)
     print("  GENERANDO TEST")
     print("═"*65)
-    test_df = build_dataset(TEST_PATH, usuarios_df, negocios_df,
-                            OUT_TEST, is_train=False)
+    test_df, _ = build_dataset(TEST_PATH, usuarios_df, negocios_df,
+                               OUT_TEST, is_train=False, train_stats=train_stats)
     del test_df
     gc.collect()
 
